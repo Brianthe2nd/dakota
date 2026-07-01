@@ -1,0 +1,17 @@
+{
+  "logo": {
+    "use_cached": true,
+    "size": 59.5,
+    "location": [
+      [
+        8,
+        10
+      ],
+      [
+        62,
+        75
+      ]
+    ],
+    "template_path": "samples/logo.png"
+  }
+}

@@ -1,0 +1,4 @@
+check f dakota uses minis
+if yes modify the pair so that it works out 
+check if gold scles the same in lots as contracts
+confirm that buy -ve issue

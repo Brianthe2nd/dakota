@@ -1,0 +1,56 @@
+vlcsnap-2026-06-19-15h26m08s055
+logo_height = 59.5
+sell_in_profit = 22
+sl = 19
+
+vlcsnap-2026-06-19-17h46m31s856.png
+logo_height = 59.5
+sl = 19
+buy_in_loss = 21
+
+vlcsnap-2026-06-19-15h25m09s986.png
+logo_height = 59.5
+sl = 19
+buy_in_loss = 21
+
+vlcsnap-2026-06-19-17h47m06s711.png
+logo_height = 64
+sell_in_profit = 22
+sl = 19
+
+vlcsnap-2026-06-19-17h58m31s400.png
+logo_height = 64
+sell_in_profit = 22
+sl = 19
+
+vlcsnap-2026-06-19-15h25m50s337.png
+logo_height = 59.5
+buy_in_profit = 22
+sl = 16
+
+
+buy_in_loss
+section_1 = 48
+section_2 = 24
+section_3 = 22
+
+sl
+section_1 = 46
+section_2 = 25
+section_3 = 21
+
+buy_in_profit
+section_1 = 48
+section_2 = 22
+section_3 = 23
+
+sell_in_profit
+section_1 = 47
+section_2 = 25
+section_3 = 22
+
+sell_in_loss
+section_1 = 46
+section_2 = 23
+section_3 = 24
+

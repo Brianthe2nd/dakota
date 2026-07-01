@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Live Frame Extractor",
+  "version": "2.0",
+  "description": "Captures 1s JPEG frames and syncs the live player.",
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*.youtube.com/*",
+    "http://localhost:5000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.youtube.com/*"],
+      "js": ["content_script.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
