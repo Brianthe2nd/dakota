@@ -163,19 +163,6 @@ def sync_trade_with_mt5(
     prev_lots = state.get("lots")
     failure_count = state.get("failure_count", 0)
 
-    # if status != "success":
-    #     if prev_pair and confirmed_dakota and confirmed_pair:
-    #         symbol = _get_symbol(prev_pair, symbol_map)
-    #         if symbol:
-    #             close_result = _close_symbol_positions(symbol)
-    #             state.clear()
-    #             _save_state(state, state_path)
-    #             return {
-    #                 "action": "closed_missing_trade",
-    #                 "symbol": symbol,
-    #                 "close_result": close_result,
-    #             }
-    #     return {"action": "ignored", "reason": "main.py result not successful"}
 
     if not confirmed_dakota or not confirmed_pair or pair is None or contract_size is None:
         return {"action": "ignored", "reason": "trade not confirmed or missing contract data"}

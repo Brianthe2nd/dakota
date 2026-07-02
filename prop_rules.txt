@@ -1,0 +1,25 @@
+A trader may not risk more than 50% of the daily drawdown on a single trading idea. In order for the risk team to accurately calculate the risk, a Stop Loss (SL) must be added to the trade within a maximum of two minutes after opening the position. 
+A trading idea refers to a group of trades that share a common logic or intention applied to the same financial asset. These trades may be opened simultaneously or within a few minutes, as long as they are aligned in the same direction (buy or sell) and follow the same analysis or strategy.
+
+Multiple trades will be considered part of the same trading idea if:
+
+• They are opened on the same asset
+• They have the same direction (buy or sell)
+• They are executed within a time interval of no more than 30 minutes between each other
+​
+
+After 30 minutes from the closing of the last trade, new trades on the same asset and in the same direction will be considered a new trading idea, unless there is a valid technical justification.
+​Trades at BE (Break Even) and TP (Take Profit) will not count towards risk, allowing the trader to continue trading without adding risk from previous trades.
+​
+
+The trading idea and its risk will always be measured based on the highest risk defined by the stop loss. The initial stop loss will be the first valid reference for risk calculation. If later modifications increase the risk, the highest stop loss value will be used.
+​
+
+If a trade has, for example, a 2% stop loss and closes in profit, and the trader opens a new trade on the same asset and direction within 30 minutes, it will still be considered the same trading idea, maintaining the initial 2% stop loss as the reference for risk measurement.
+​
+
+In other words, a trading idea may consist of one or multiple positions opened on the same instrument, aiming to capitalize on a specific market opportunity identified by the trader, whether through technical, fundamental, or quantitative analysis.
+
+You must place a Stop Loss within the first two minutes after opening a trade.
+
+Trades of less than 60 seconds duration are not allowed in the fund 
