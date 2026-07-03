@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prop Firm Bot Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for tables */
+        ::-webkit-scrollbar { width: 6px; height: 6px;}
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 3px; }
+        .blink { animation: blinker 1.5s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen p-6 font-sans">
+    <div class="max-w-7xl mx-auto space-y-6">
+        
+        <div class="flex justify-between items-center border-b border-gray-700 pb-4">
+            <h1 class="text-3xl font-bold tracking-tight text-blue-400">Dakota Execution Monitor</h1>
+            <div class="flex items-center space-x-2">
+                <span class="relative flex h-3 w-3">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                </span>
+                <span class="text-sm text-gray-400">Live Sync</span>
+            </div>
+        </div>
+
+        <div id="timer-banner" class="hidden bg-yellow-600/20 border border-yellow-500 text-yellow-300 p-4 rounded-lg flex items-center justify-between">
+            <div class="flex items-center">
+                <svg class="w-6 h-6 mr-3 blink" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span id="timer-text" class="font-semibold text-lg">Rule 13 Pause Active...</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg">
+                <p class="text-sm text-gray-400 uppercase tracking-wider">Account Size</p>
+                <p id="account-size" class="text-3xl font-bold text-white mt-2">$0.00</p>
+            </div>
+            <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg">
+                <p class="text-sm text-gray-400 uppercase tracking-wider">Daily Drawdown Limit</p>
+                <p id="daily-dd" class="text-3xl font-bold text-red-400 mt-2">$0.00</p>
+            </div>
+            <div class="bg-gray-800 rounded-xl p-5 border border-gray-700 shadow-lg">
+                <p class="text-sm text-gray-400 uppercase tracking-wider">Max Idea Risk (50% DD)</p>
+                <p id="max-idea-risk" class="text-3xl font-bold text-orange-400 mt-2">$0.00</p>
+            </div>
+        </div>
+
+        <div class="bg-gray-800 rounded-xl p-6 border border-gray-700 shadow-lg">
+            <div class="flex justify-between items-end mb-2">
+                <div>
+                    <h2 class="text-lg font-semibold text-white">Current Idea Risk</h2>
+                    <p class="text-sm text-gray-400">Open Risk + Realized 30m Loss</p>
+                </div>
+                <div class="text-right">
+                    <p id="total-risk-text" class="text-2xl font-bold text-white">$0.00</p>
+                    <p id="risk-percentage" class="text-sm text-gray-400">0% of Limit</p>
+                </div>
+            </div>
+            <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden">
+                <div id="risk-bar" class="bg-blue-500 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between mt-3 text-sm font-medium">
+                <span class="text-gray-400">Open: <span id="open-risk" class="text-yellow-400">$0.00</span></span>
+                <span class="text-gray-400">Realized (30m): <span id="realized-risk" class="text-red-400">$0.00</span></span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[500px]">
+            <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-lg flex flex-col">
+                <div class="p-4 border-b border-gray-700">
+                    <h2 class="text-lg font-semibold text-white">Live Execution Log</h2>
+                </div>
+                <div class="p-0 overflow-y-auto flex-1">
+                    <table class="w-full text-left text-sm text-gray-400">
+                        <thead class="text-xs uppercase bg-gray-700/50 text-gray-300 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3">Time</th>
+                                <th class="px-4 py-3">Signal</th>
+                                <th class="px-4 py-3">Result</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-body" class="divide-y divide-gray-700">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-lg flex flex-col">
+                <div class="p-4 border-b border-gray-700 flex justify-between">
+                    <h2 class="text-lg font-semibold text-white">Open Positions & Recent Deals</h2>
+                </div>
+                <div class="p-0 overflow-y-auto flex-1">
+                    <table class="w-full text-left text-sm text-gray-400">
+                        <thead class="text-xs uppercase bg-gray-700/50 text-gray-300 sticky top-0">
+                            <tr>
+                                <th class="px-4 py-3">Symbol / ID</th>
+                                <th class="px-4 py-3">Type</th>
+                                <th class="px-4 py-3">Profit</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mt5-body" class="divide-y divide-gray-700">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const formatMoney = (num) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num || 0);
+
+        async function fetchDashboardData() {
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                
+                // Update Metrics
+                document.getElementById('account-size').innerText = formatMoney(data.metrics.account_size);
+                document.getElementById('daily-dd').innerText = formatMoney(data.metrics.daily_dd);
+                document.getElementById('max-idea-risk').innerText = formatMoney(data.metrics.max_idea_risk);
+
+                // Update Risk
+                const maxRisk = data.metrics.max_idea_risk || 1;
+                const totalRisk = data.risk.total_risk || 0;
+                let riskPct = (totalRisk / maxRisk) * 100;
+                riskPct = Math.min(riskPct, 100); // Cap at 100% for bar
+
+                document.getElementById('total-risk-text').innerText = formatMoney(totalRisk);
+                document.getElementById('open-risk').innerText = formatMoney(data.risk.open_risk);
+                document.getElementById('realized-risk').innerText = formatMoney(data.risk.realized_loss_30m);
+                document.getElementById('risk-percentage').innerText = `${riskPct.toFixed(1)}% of Limit`;
+                
+                const riskBar = document.getElementById('risk-bar');
+                riskBar.style.width = `${riskPct}%`;
+                if(riskPct < 50) riskBar.className = "bg-green-500 h-4 rounded-full transition-all duration-500";
+                else if (riskPct < 85) riskBar.className = "bg-yellow-500 h-4 rounded-full transition-all duration-500";
+                else riskBar.className = "bg-red-500 h-4 rounded-full transition-all duration-500";
+
+                // Update Timer Banner
+                const timerBanner = document.getElementById('timer-banner');
+                if (data.timer && data.timer.active) {
+                    timerBanner.classList.remove('hidden');
+                    document.getElementById('timer-text').innerText = data.timer.message;
+                } else {
+                    timerBanner.classList.add('hidden');
+                }
+
+                // Update Logs Table
+                const logsHtml = data.logs.map(log => `
+                    <tr class="hover:bg-gray-700/50">
+                        <td class="px-4 py-3 whitespace-nowrap">${log.time}</td>
+                        <td class="px-4 py-3">
+                            <span class="font-medium text-white">${log.pair || 'Unknown'}</span><br>
+                            <span class="text-xs">${log.trade_type} | Sz: ${log.contract_size}</span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 rounded text-xs font-medium ${log.result === 'rejected' ? 'bg-red-900/50 text-red-400' : 'bg-green-900/50 text-green-400'}">
+                                ${log.result.toUpperCase()}
+                            </span><br>
+                            <span class="text-xs">${log.reason || ''}</span>
+                        </td>
+                    </tr>
+                `).join('');
+                document.getElementById('logs-body').innerHTML = logsHtml;
+
+                // Update MT5 Table (Positions + Deals)
+                let mt5Html = '';
+                
+                if (data.positions.length > 0) {
+                    mt5Html += `<tr><td colspan="3" class="px-4 py-2 bg-gray-800/80 font-bold text-white text-xs tracking-wider">ACTIVE POSITIONS</td></tr>`;
+                    data.positions.forEach(p => {
+                        mt5Html += `
+                        <tr class="hover:bg-gray-700/50">
+                            <td class="px-4 py-3">
+                                <span class="font-medium text-white">${p.symbol}</span><br>
+                                <span class="text-xs text-gray-500">#${p.ticket} | SL: ${p.sl}</span>
+                            </td>
+                            <td class="px-4 py-3 font-medium ${p.type === 'BUY' ? 'text-blue-400' : 'text-purple-400'}">${p.type} (${p.volume})</td>
+                            <td class="px-4 py-3 font-bold ${p.profit >= 0 ? 'text-green-400' : 'text-red-400'}">${formatMoney(p.profit)}</td>
+                        </tr>`;
+                    });
+                }
+
+                if (data.deals.length > 0) {
+                    mt5Html += `<tr><td colspan="3" class="px-4 py-2 bg-gray-800/80 font-bold text-white text-xs tracking-wider mt-2 border-t border-gray-700">RECENT DEALS (30M)</td></tr>`;
+                    data.deals.forEach(d => {
+                        mt5Html += `
+                        <tr class="hover:bg-gray-700/50 opacity-75">
+                            <td class="px-4 py-3">
+                                <span class="font-medium text-gray-300">${d.symbol}</span><br>
+                                <span class="text-xs text-gray-500">${d.time}</span>
+                            </td>
+                            <td class="px-4 py-3 text-gray-400">Closed</td>
+                            <td class="px-4 py-3 font-bold ${d.profit >= 0 ? 'text-green-500' : 'text-red-500'}">${formatMoney(d.profit)}</td>
+                        </tr>`;
+                    });
+                }
+                document.getElementById('mt5-body').innerHTML = mt5Html;
+
+            } catch (error) {
+                console.error("Dashboard Sync Error:", error);
+            }
+        }
+
+        // Poll every 1.5 seconds
+        setInterval(fetchDashboardData, 1500);
+        fetchDashboardData();
+    </script>
+</body>
+</html>
