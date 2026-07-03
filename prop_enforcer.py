@@ -4,10 +4,10 @@ import MetaTrader5 as mt5
 from mt5_funcs import sync_trade_with_mt5, _get_mt5_positions, _get_symbol, _calculate_target_lots, get_account_size
 
 class PropFirmManager:
-    def __init__(self, daily_drawdown_limit: float, dashboard_state, default_sl_points: int = 150):
+    def __init__(self, daily_drawdown_limit: float, dashboard_state, default_sl_points: int = 135):
         self.daily_dd = daily_drawdown_limit
         self.max_idea_risk = daily_drawdown_limit * 0.50 
-        self.min_trade_duration_seconds = 80
+        self.min_trade_duration_seconds = 70
         self.default_sl_points = default_sl_points
         self.dash = dashboard_state # Inject Dashboard State
         
