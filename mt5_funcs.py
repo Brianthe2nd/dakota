@@ -69,6 +69,7 @@ def _calculate_target_lots(contract_size: float, pair: str, account_size: float,
     # 150000 = con
     # acc_ba
     dakotas_acc_size = 150000
+    contract_size = contract_size * 0.1
     normalized_contract_size = account_size * contract_size / dakotas_acc_size
     scaled = normalized_contract_size * multiplier
     lots = max(0.01, round(scaled / 10000.0, 2))
