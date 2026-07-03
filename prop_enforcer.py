@@ -16,7 +16,7 @@ class PropFirmManager:
         self.max_idea_risk = daily_drawdown_limit * 0.50 
         
         # Buffer to safely bypass the "Trades of less than 60 seconds duration are not allowed" rule.
-        self.min_trade_duration_seconds = 80 
+        self.min_trade_duration_seconds = 80
         self.default_sl_points = default_sl_points
     def process_trade_signal(self, main_result: dict, account_size: float = None, multiplier: float = 1.0, state_path: str = "mt5_state.json", symbol_map: dict = None) -> dict:
             """
@@ -48,6 +48,7 @@ class PropFirmManager:
             self._enforce_stop_losses(symbol)
 
             return sync_result
+    
     def _delay_if_premature_close(self, symbol: str, main_result: dict):
         """
         Delays the execution if the strategy sends a signal to close/reduce a position 
@@ -136,11 +137,13 @@ class PropFirmManager:
             if pos.type == order_type:  # Same direction [cite: 4]
                 existing_lots += pos.volume
                 
-                # Trades at BE and TP do not count towards risk 
-                if is_buy and pos.sl >= pos.price_open:
-                    continue 
+                # Trades at BE and TP do not count towards risk.
+                # A buy position is at BE when SL is at or above the entry price,
+                # and a sell position is at BE when SL is at or below the entry price.
+                if is_buy and pos.sl > 0 and pos.sl >= pos.price_open:
+                    continue
                 elif not is_buy and pos.sl > 0 and pos.sl <= pos.price_open:
-                    continue 
+                    continue
                 
                 # Calculate the highest risk defined by the stop loss [cite: 7]
                 if pos.sl > 0:
@@ -159,8 +162,8 @@ class PropFirmManager:
         if deals:
             for deal in deals:
                 # We only care about closing deals (DEAL_ENTRY_OUT) that resulted in a loss.
-                # Profitable trades (TP/BE) do not count towards risk limits 
-                if deal.entry == mt5.DEAL_ENTRY_OUT and deal.profit < 0:
+                # Trades closed at TP/BE do not count towards risk limits.
+                if deal.entry == mt5.DEAL_ENTRY_OUT and deal.profit < 0 and deal.reason != mt5.DEAL_REASON_TP:
                     # MT5 Deal Types are inverted for exits. A SELL deal closes a BUY position.
                     original_was_buy = (deal.type == mt5.DEAL_TYPE_SELL)
                     # Check if it was in the same direction 

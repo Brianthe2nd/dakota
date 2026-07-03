@@ -113,6 +113,57 @@ def _close_symbol_positions(symbol: str) -> Dict:
     return {"closed_positions": closed}
 
 
+def _close_partial_position(symbol: str, volume_to_close: float) -> Dict:
+    """Close the oldest open positions first, partially or fully as needed."""
+    _ensure_mt5_initialized()
+
+    if volume_to_close <= 0:
+        return {"status": "ignored", "reason": "no volume to close"}
+
+    positions = mt5.positions_get(symbol=symbol)
+    if positions is None or not positions:
+        return {"status": "ignored", "reason": "position not found"}
+
+    ordered_positions = sorted(positions, key=lambda pos: getattr(pos, "time", 0))
+    remaining_volume = float(volume_to_close)
+    closed_positions = []
+
+    for pos in ordered_positions:
+        if remaining_volume <= 0:
+            break
+        if pos.volume <= 0:
+            continue
+
+        volume_now = min(float(pos.volume), remaining_volume)
+        request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": round(volume_now, 2),
+            "position": pos.ticket,
+            "type": mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY,
+            "price": mt5.symbol_info_tick(symbol).ask if pos.type == mt5.ORDER_TYPE_BUY else mt5.symbol_info_tick(symbol).bid,
+            "deviation": 100,
+            "magic": 0,
+            "comment": "partial_close",
+            "type_filling": mt5.ORDER_FILLING_FOK,
+        }
+        result = mt5.order_send(request)
+        closed_positions.append(
+            {
+                "ticket": pos.ticket,
+                "volume_closed": round(volume_now, 2),
+                "result": result._asdict() if hasattr(result, "_asdict") else str(result),
+            }
+        )
+        remaining_volume -= volume_now
+
+    return {
+        "status": "closed" if remaining_volume <= 0 else "partial",
+        "remaining_volume": round(remaining_volume, 2),
+        "closed_positions": closed_positions,
+    }
+
+
 def _open_additional_volume(symbol: str, volume: float, trade_type: str) -> Dict:
     _ensure_mt5_initialized()
     if volume <= 0:
@@ -180,37 +231,37 @@ def sync_trade_with_mt5(
     desired_lots = _calculate_target_lots(contract_size, pair, resolved_account_size, multiplier)
     trade_type = str(main_result.get("trades", {}).get("trade_type", "unknown")).lower()
 
-    if trade_type == "unknown":
-        if prev_pair and confirmed_pair and prev_pair == pair:
-            failure_count += 1
-            state.update({
-                "pair": pair,
-                "contract_size": contract_size,
-                "lots": existing_net_lots,
-                "failure_count": failure_count,
-            })
-            if failure_count >= 3:
-                close_result = _close_symbol_positions(symbol)
-                state.clear()
-                _save_state(state, state_path)
-                return {
-                    "action": "closed_after_failures",
-                    "symbol": symbol,
-                    "close_result": close_result,
-                    "failure_count": failure_count,
-                }
-            _save_state(state, state_path)
-            return {
-                "action": "ignored",
-                "reason": "trade_type unknown, confirmed pair matches existing trade",
-                "pair": pair,
-                "failure_count": failure_count,
-            }
-        return {
-            "action": "ignored",
-            "reason": "trade_type unknown with no matching existing trade",
-            "pair": pair,
-        }
+    # if trade_type == "unknown":
+    #     if prev_pair and confirmed_pair and prev_pair == pair:
+    #         failure_count += 1
+    #         state.update({
+    #             "pair": pair,
+        #             "contract_size": contract_size,
+        #             "lots": existing_net_lots,
+    #             "failure_count": failure_count,
+    #         })
+    #         if failure_count >= 3:
+    #             close_result = _close_symbol_positions(symbol)
+    #             state.clear()
+    #             _save_state(state, state_path)
+    #             return {
+    #                 "action": "closed_after_failures",
+    #                 "symbol": symbol,
+    #                 "close_result": close_result,
+    #                 "failure_count": failure_count,
+    #             }
+    #         _save_state(state, state_path)
+    #         return {
+    #             "action": "ignored",
+    #             "reason": "trade_type unknown, confirmed pair matches existing trade",
+    #             "pair": pair,
+    #             "failure_count": failure_count,
+    #         }
+    #     return {
+    #         "action": "ignored",
+    #         "reason": "trade_type unknown with no matching existing trade",
+    #         "pair": pair,
+    #     }
 
     desired_signed_lots = desired_lots if trade_type.startswith("buy") else -desired_lots
 
@@ -245,7 +296,8 @@ def sync_trade_with_mt5(
     if abs(existing_net_lots) > abs(desired_signed_lots):
         if prev_contract_size is not None and contract_size < prev_contract_size:
             reduce_amount = abs(existing_net_lots) - abs(desired_signed_lots)
-            close_result = _close_symbol_positions(symbol)
+            # close_result = _close_symbol_positions(symbol)
+            partial_close_result = _close_partial_position(symbol, reduce_amount)
             state.update({"pair": pair, "contract_size": contract_size, "lots": desired_signed_lots, "failure_count": 0})
             _save_state(state, state_path)
             return {
@@ -254,7 +306,7 @@ def sync_trade_with_mt5(
                 "reduced_amount": reduce_amount,
                 "existing_net_lots": existing_net_lots,
                 "desired_signed_lots": desired_signed_lots,
-                "close_result": close_result,
+                "close_result": partial_close_result,
             }
         return {
             "action": "ignored",
