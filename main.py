@@ -5,7 +5,11 @@ import time
 import datetime
 import MetaTrader5 as mt5
 
-from main_img_processor import process_new_image, watch_and_process_frames
+from main_img_processor import (
+    process_new_image,
+    watch_and_process_frames,
+    process_result_entries_from_json,
+)
 from mt5_funcs import get_account_size
 from prop_enforcer import PropFirmManager
 from dashboard_state import DashboardState  # Import State Manager
@@ -53,6 +57,9 @@ def mt5_data_poller(dash_state):
                 dash_state.update("metrics", {"account_size": acc_info.balance})
 
         except Exception as e:
+            import traceback
+            print("Error in mt5 data poller:", e)
+            traceback.print_exc()
             pass
         time.sleep(2) # Poll every 2 seconds
 
@@ -101,19 +108,22 @@ def build_mt5_callback(prop_manager, dashboard_state, account_size=10000.0, mult
 def main():
     parser = argparse.ArgumentParser(description="Process Dakota frames and sync trades safely via Prop Enforcer")
     parser.add_argument("--frames-folder", default=os.getenv("FRAMES_FOLDER", "./received_frames"))
+    parser.add_argument("--results", help="Path to a JSON file containing precomputed result objects")
     parser.add_argument("--account-size", type=float, default=None)
     parser.add_argument("--multiplier", type=float, default=float(os.getenv("MULTIPLIER", "1.0")))
     parser.add_argument("--state-path", default=os.getenv("MT5_STATE_PATH", "mt5_state.json"))
-    parser.add_argument("--daily-dd", type=float, default=float(os.getenv("DAILY_DD", "2500.0")))
+    parser.add_argument("--daily-dd", type=float, default=None)
     parser.add_argument("--default-sl", type=int, default=int(os.getenv("DEFAULT_SL", "150")))
     args = parser.parse_args()
 
     account_size = args.account_size
     if account_size is None:
         account_size = get_account_size()
-
+    if args.daily_dd is None:
+        args.daily_dd = float((2/100)* account_size)
     # 1. Initialize Dashboard State
     dash_state = DashboardState()
+    dash_state.install_log_stream()
     dash_state.update("metrics", {"account_size": account_size})
 
     # 2. Start Background Data Poller
@@ -134,7 +144,12 @@ def main():
         multiplier=args.multiplier,
         state_path=args.state_path,
     )
-    
+    # If a results JSON is provided, process those precomputed results and exit.
+    if args.results:
+        print(f"Processing precomputed result entries from {args.results}")
+        process_result_entries_from_json(args.results, on_result=callback)
+        return
+
     watch_and_process_frames(frames_folder=args.frames_folder, on_result=callback)
 
 if __name__ == "__main__":

@@ -1,0 +1,5 @@
+1. Delete any unncesary json and txt files
+2. Update config with format
+3. Start server 
+4. Configure extension
+5. Start app

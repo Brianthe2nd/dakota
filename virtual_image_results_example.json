@@ -1,0 +1,61 @@
+[
+  {
+    "id": "entry-1",
+    "result": {
+      "status": "success",
+      "pair": "Nasdaq",
+      "trades": {
+        "trade_type": "buy",
+        "status": "profit",
+        "sl": false,
+        "tp": true
+      },
+      "logo_size": 59.5,
+      "logo_loc": [[2, 3], [62, 65]],
+      "contract_size": 100
+    }
+  },
+  {
+    "id": "entry-2",
+    "result": {
+      "status": "success",
+      "pair": "Nasdaq",
+      "trades": {
+        "trade_type": "buy",
+        "status": "profit",
+        "sl": false,
+        "tp": true
+      },
+      "logo_size": 59.5,
+      "logo_loc": [[2, 3], [62, 65]],
+      "contract_size": 100
+    }
+  },
+  {
+    "id": "entry-3",
+    "result": {
+      "status": "success",
+      "pair": "Nasdaq",
+      "trades": {
+        "trade_type": "buy",
+        "status": "profit",
+        "sl": false,
+        "tp": true
+      },
+      "logo_size": 59.5,
+      "logo_loc": [[2, 3], [62, 65]],
+      "contract_size": 50
+    }
+  },
+  {
+    "id": "entry-4",
+    "result": {
+      "status": "rejected",
+      "pair": null,
+      "trades": {},
+      "logo_size": 0,
+      "logo_loc": [[0, 0], [0, 0]],
+      "contract_size": null
+    }
+  }
+]

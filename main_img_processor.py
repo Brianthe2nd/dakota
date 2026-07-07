@@ -178,6 +178,99 @@ def process_new_image(image_path):
         return {"status": "error", "message": f"Failed to fetch trades: {str(e)}"}
 
 
+def load_result_entries_from_json(json_path):
+    """Load result entries from a JSON file.
+
+    Supported JSON shapes:
+      - a list of result objects
+      - an object containing a result list under "results", "items", or "entries"
+
+    Each entry is normalized into a dict with a "source" wrapper and a "result" object.
+    """
+    with open(json_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    if isinstance(data, dict):
+        if "results" in data:
+            items = data["results"]
+        elif "items" in data:
+            items = data["items"]
+        elif "entries" in data:
+            items = data["entries"]
+        else:
+            raise ValueError(
+                "JSON file must contain either a top-level list or an object with 'results', 'items', or 'entries'."
+            )
+    elif isinstance(data, list):
+        items = data
+    else:
+        raise ValueError(
+            "Unsupported JSON format. Use a list or an object with 'results', 'items', or 'entries'."
+        )
+
+    normalized = []
+    for index, entry in enumerate(items):
+        if not isinstance(entry, dict):
+            raise ValueError(f"Entry {index} must be an object containing a result.")
+
+        result_entry = entry.get("result", entry)
+        if not isinstance(result_entry, dict):
+            raise ValueError(f"Entry {index} must contain a result object.")
+
+        if "status" not in result_entry or "trades" not in result_entry:
+            raise ValueError(
+                f"Entry {index} result object must include at least 'status' and 'trades'."
+            )
+
+        normalized.append({"source": entry, "result": result_entry})
+
+    return normalized
+
+
+def process_result_entries_from_json(json_path, on_result=None, output_path=None):
+    """Process a list of precomputed result entries from JSON.
+
+    This skips any image processing and simply iterates over stored result objects.
+    """
+    entries = load_result_entries_from_json(json_path)
+    results = []
+
+    print(f"Loaded {len(entries)} result entries from {json_path}.")
+    print("Press ENTER to process the next result, or type 'q' and ENTER to quit.")
+
+    for index, entry in enumerate(entries, start=1):
+        user_input = input(f"[{index}/{len(entries)}] Process next result? ")
+        if user_input.strip().lower() == "q":
+            print("Stopping result processing.")
+            break
+
+        source = entry["source"]
+        result = entry["result"]
+        entry_id = source.get("id") or source.get("image_path") or f"entry-{index}"
+
+        print(f"\nProcessing result entry {index}: {entry_id}")
+        print(json.dumps(result, indent=2))
+
+        record = {"source": source, "result": result}
+        results.append(record)
+
+        if on_result is not None:
+            try:
+                on_result(result, source)
+            except Exception as callback_error:
+                print(f"Error in result callback: {callback_error}")
+
+        if output_path:
+            try:
+                with open(output_path, "w", encoding="utf-8") as out_file:
+                    json.dump(results, out_file, indent=2)
+                print(f"Saved interim results to {output_path}")
+            except Exception as save_error:
+                print(f"Failed to save output file: {save_error}")
+
+    return results
+
+
 def watch_and_process_frames(frames_folder="./received_frames", on_result=None):
     """
     Monitor the received_frames folder and process new images as they arrive.
@@ -222,15 +315,24 @@ def watch_and_process_frames(frames_folder="./received_frames", on_result=None):
 
 # Example usage:
 if __name__ == "__main__":
-    # Option 1: Process a single image
-    result = process_new_image("/home/brian/Desktop/yt/sample_images/vlcsnap-2026-06-19-17h58m31s400.png")
-    print("RESULT")
-    print(result)
-    
-    # Option 2: Watch and automatically process new frames as they arrive
-    # watch_and_process_frames("./received_frames")
-    pass
+    import argparse
 
+    parser = argparse.ArgumentParser(description="Dakota result processor")
+    parser.add_argument("--image", help="Path to a single image to process")
+    parser.add_argument("--results", help="Path to a JSON file containing precomputed result objects")
+    parser.add_argument("--output", help="Optional path to write processed results as JSON")
+    args = parser.parse_args()
 
-
-
+    if args.results:
+        all_results = process_result_entries_from_json(args.results, output_path=args.output)
+        print(f"Finished processing {len(all_results)} result entries.")
+        if args.output:
+            print(f"Results written to {args.output}")
+    elif args.image:
+        result = process_new_image(args.image)
+        print("RESULT")
+        print(result)
+    else:
+        print("Please provide --image <path> or --results <path>.")
+        print("Example result JSON formats:")
+        print("  [{\"id\": \"entry-1\", \"result\": {\"status\": \"success\", \"pair\": \"Nasdaq\", \"trades\": {\"trade_type\": \"buy\", \"status\": \"profit\", \"sl\": false, \"tp\": true}, \"logo_size\": 59.5, \"logo_loc\": [[2, 3], [62, 65]], \"contract_size\": 1.5}}]")

@@ -1,17 +1,28 @@
-import time
 import datetime
-import MetaTrader5 as mt5
-from mt5_funcs import sync_trade_with_mt5, _get_mt5_positions, _get_symbol, _calculate_target_lots, get_account_size
+import time
+
+try:
+    import MetaTrader5 as mt5
+except ImportError:  # pragma: no cover - environment dependent
+    mt5 = None
+
+from mt5_funcs import (
+    _calculate_target_lots,
+    _get_mt5_positions,
+    _get_symbol,
+    get_account_size,
+    match_trade_risk_with_mt5,
+    sync_trade_with_mt5,
+)
+
 
 class PropFirmManager:
     def __init__(self, daily_drawdown_limit: float, dashboard_state, default_sl_points: int = 135):
         self.daily_dd = daily_drawdown_limit
-        self.max_idea_risk = daily_drawdown_limit * 0.50 
+        self.max_idea_risk = daily_drawdown_limit * 0.50
         self.min_trade_duration_seconds = 70
         self.default_sl_points = default_sl_points
-        self.dash = dashboard_state # Inject Dashboard State
-        
-        # Initialize static metrics on UI
+        self.dash = dashboard_state
         self.dash.update("metrics", {"daily_dd": self.daily_dd, "max_idea_risk": self.max_idea_risk})
 
     def process_trade_signal(self, main_result: dict, account_size: float = None, multiplier: float = 1.0, state_path: str = "mt5_state.json", symbol_map: dict = None) -> dict:
@@ -27,16 +38,47 @@ class PropFirmManager:
         self._delay_if_premature_close(symbol, main_result)
 
         sync_result = sync_trade_with_mt5(
-            main_result, 
-            account_size=account_size, 
-            multiplier=multiplier, 
-            state_path=state_path, 
-            symbol_map=symbol_map
+            main_result,
+            account_size=account_size,
+            multiplier=multiplier,
+            state_path=state_path,
+            symbol_map=symbol_map,
         )
 
         self._enforce_stop_losses(symbol)
         return sync_result
-    
+
+    def process_manual_risk_match(self, payload: dict, account_size: float = None, multiplier: float = 1.0, state_path: str = "mt5_state.json", symbol_map: dict = None) -> dict:
+        pair = payload.get("pair")
+        symbol = _get_symbol(pair, symbol_map)
+        if not symbol:
+            return {"action": "ignored", "reason": "No valid symbol found"}
+
+        trade_type = str(payload.get("trade_type", "buy")).lower()
+        sl_points = float(payload.get("sl_points") or self.default_sl_points)
+        effective_sl_points = max(sl_points, float(self.default_sl_points))
+        main_result = {
+            "pair": pair,
+            "contract_size": payload.get("contract_size", 0),
+            "status": "success",
+            "confirmed_dakota": True,
+            "confirmed_pair": bool(pair),
+            "trades": {"trade_type": trade_type},
+        }
+
+        if not self._is_risk_acceptable(symbol, main_result, sl_points=effective_sl_points):
+            return {"action": "rejected", "reason": "Trade exceeds 50% daily drawdown risk limit"}
+
+        return match_trade_risk_with_mt5(
+            main_result,
+            account_size=account_size,
+            multiplier=multiplier,
+            state_path=state_path,
+            symbol_map=symbol_map,
+            sl_points=effective_sl_points,
+            default_sl_points=float(self.default_sl_points),
+        )
+
     def _delay_if_premature_close(self, symbol: str, main_result: dict):
         target_size = main_result.get("contract_size")
         if target_size is not None and target_size <= 0:
@@ -47,8 +89,6 @@ class PropFirmManager:
                     sleep_time = self.min_trade_duration_seconds - elapsed_time
                     msg = f"Rule 13 Active: Trade open {elapsed_time:.1f}s. Pausing for {sleep_time:.1f}s"
                     print(f"[Prop Firm Rule] {msg}")
-                    
-                    # Update UI Timer
                     self.dash.update("timer", {"active": True, "message": msg})
                     time.sleep(sleep_time)
                     self.dash.update("timer", {"active": False, "message": ""})
@@ -56,52 +96,57 @@ class PropFirmManager:
     def _enforce_stop_losses(self, symbol: str):
         if not mt5.terminal_info():
             mt5.initialize()
-            
+
         positions = _get_mt5_positions(symbol)
         for pos in positions:
-            if pos.sl == 0.0:  
+            if pos.sl == 0.0:
                 point = mt5.symbol_info(symbol).point
                 if pos.type == mt5.ORDER_TYPE_BUY:
-                    sl_price = pos.price_open - (self.default_sl_points * point)
+                    sl_price = pos.price_open - self.default_sl_points
                 else:
-                    sl_price = pos.price_open + (self.default_sl_points * point)
+                    sl_price = pos.price_open + self.default_sl_points
 
                 request = {
                     "action": mt5.TRADE_ACTION_SLTP,
                     "position": pos.ticket,
                     "symbol": symbol,
                     "sl": sl_price,
-                    "tp": pos.tp
+                    "tp": pos.tp,
                 }
                 result = mt5.order_send(request)
                 if result and result.retcode == mt5.TRADE_RETCODE_DONE:
                     print(f"[Prop Firm Rule] Emergency SL set for ticket {pos.ticket}")
 
-    def _is_risk_acceptable(self, symbol: str, main_result: dict) -> bool:
+    def _is_risk_acceptable(self, symbol: str, main_result: dict, sl_points: float = None) -> bool:
         trade_type_str = str(main_result.get("trades", {}).get("trade_type", "")).lower()
         if trade_type_str == "unknown" or not trade_type_str:
-            return True 
-            
+            return True
+
         is_buy = trade_type_str.startswith("buy")
         order_type = mt5.ORDER_TYPE_BUY if is_buy else mt5.ORDER_TYPE_SELL
 
         symbol_info = mt5.symbol_info(symbol)
-        if symbol_info is None: return False
+        if symbol_info is None:
+            print(f"[Prop Firm Rule] Error: Could not get symbol info for {symbol}")
+            return False
 
         tick_value, tick_size, point = symbol_info.trade_tick_value, symbol_info.trade_tick_size, symbol_info.point
-        sl_distance_price = self.default_sl_points * point
+        effective_sl_points = max(float(sl_points or self.default_sl_points), float(self.default_sl_points))
+        sl_distance_price = effective_sl_points * point
         risk_per_lot = (sl_distance_price / tick_size) * tick_value
 
         open_risk = 0.0
         positions = _get_mt5_positions(symbol)
         existing_lots = 0.0
-        
+
         for pos in positions:
-            if pos.type == order_type: 
+            if pos.type == order_type:
                 existing_lots += pos.volume
-                if is_buy and pos.sl > 0 and pos.sl >= pos.price_open: continue
-                elif not is_buy and pos.sl > 0 and pos.sl <= pos.price_open: continue
-                
+                if is_buy and pos.sl > 0 and pos.sl >= pos.price_open:
+                    continue
+                elif not is_buy and pos.sl > 0 and pos.sl <= pos.price_open:
+                    continue
+
                 if pos.sl > 0:
                     dist = (pos.price_open - pos.sl) if is_buy else (pos.sl - pos.price_open)
                     open_risk += (dist / tick_size) * tick_value * pos.volume
@@ -111,11 +156,11 @@ class PropFirmManager:
         realized_idea_loss = 0.0
         time_from = datetime.datetime.now() - datetime.timedelta(minutes=30)
         deals = mt5.history_deals_get(time_from, datetime.datetime.now(), group=symbol)
-        
+
         if deals:
             for deal in deals:
                 if deal.entry == mt5.DEAL_ENTRY_OUT and deal.profit < 0 and deal.reason != mt5.DEAL_REASON_TP:
-                    original_was_buy = (deal.type == mt5.DEAL_TYPE_SELL)
+                    original_was_buy = deal.type == mt5.DEAL_TYPE_SELL
                     if (is_buy and original_was_buy) or (not is_buy and not original_was_buy):
                         realized_idea_loss += abs(deal.profit)
 
@@ -130,18 +175,9 @@ class PropFirmManager:
             return False
 
         total_idea_risk = open_risk + realized_idea_loss + new_trade_risk
-        
-        # Broadcast Risk Status to UI
-        self.dash.update("risk", {
-            "open_risk": open_risk,
-            "realized_loss_30m": realized_idea_loss,
-            "total_risk": total_idea_risk
-        })
+        self.dash.update("risk", {"open_risk": open_risk, "realized_loss_30m": realized_idea_loss, "total_risk": total_idea_risk})
 
-        if total_idea_risk > self.max_idea_risk:
-            return False
-            
-        return True
+        return total_idea_risk <= self.max_idea_risk
 
 
 

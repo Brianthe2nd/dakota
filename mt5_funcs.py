@@ -9,7 +9,7 @@ except ImportError:
 
 
 DEFAULT_SYMBOL_MAP = {
-    "nasdaq": "NAS100",
+    "nasdaq": "US100",
     "nq": "NAS100",
     "gold": "XAUUSD",
     "xau": "XAUUSD",
@@ -72,8 +72,54 @@ def _calculate_target_lots(contract_size: float, pair: str, account_size: float,
     contract_size = contract_size * 0.1
     normalized_contract_size = account_size * contract_size / dakotas_acc_size
     scaled = normalized_contract_size * multiplier
-    lots = max(0.01, round(scaled / 10000.0, 2))
+    lots = max(0.01, round(scaled, 2))
+    print("The desrired lots are ", lots)
     return lots
+
+
+def calculate_calculator_result(x: float, numerator: float = 150.0, denominator: float = 0.33) -> float:
+    if x == 0:
+        raise ValueError("x cannot be zero")
+    return (float(numerator) / float(x)) * float(denominator)
+
+
+def estimate_sl_points_from_crop(image_path: Optional[str], crop: Optional[Dict] = None, default_points: float = 150.0) -> float:
+    if not image_path or not os.path.exists(image_path):
+        return float(default_points)
+    try:
+        import cv2
+    except ImportError:
+        return float(default_points)
+
+    image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+    if image is None:
+        return float(default_points)
+
+    height, width = image.shape[:2]
+    if crop:
+        x = max(0, int(crop.get("x", 0)))
+        y = max(0, int(crop.get("y", 0)))
+        crop_width = max(1, int(crop.get("width", width)))
+        crop_height = max(1, int(crop.get("height", height)))
+        if x <= 100 and y <= 100 and crop_width <= 100 and crop_height <= 100:
+            x = int(round((x / 100.0) * width))
+            y = int(round((y / 100.0) * height))
+            crop_width = int(round((crop_width / 100.0) * width))
+            crop_height = int(round((crop_height / 100.0) * height))
+        x2 = min(width, x + crop_width)
+        y2 = min(height, y + crop_height)
+        cropped = image[y:y2, x:x2]
+    else:
+        cropped = image
+
+    if cropped.size == 0:
+        return float(default_points)
+
+    gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150)
+    edge_density = cv2.countNonZero(edges) / float(edges.size)
+    base_distance = ((cropped.shape[1] + cropped.shape[0]) / 2.0) * (0.4 + edge_density)
+    return round(float(max(default_points * 0.5, min(default_points * 2.0, base_distance / 2.0))), 2)
 
 
 def _get_mt5_positions(symbol: str):
@@ -184,6 +230,80 @@ def _open_additional_volume(symbol: str, volume: float, trade_type: str) -> Dict
     }
     result = mt5.order_send(request)
     return {"result": result._asdict() if hasattr(result, "_asdict") else str(result)}
+
+
+def match_trade_risk_with_mt5(
+    main_result: Dict,
+    account_size: Optional[float] = None,
+    multiplier: float = 1.0,
+    state_path: str = "mt5_state.json",
+    symbol_map: Optional[Dict[str, str]] = None,
+    sl_points: Optional[float] = None,
+    default_sl_points: float = 150.0,
+) -> Dict:
+    """Adjust an existing MT5 position to a new risk profile using a manual SL distance."""
+    pair = main_result.get("pair")
+    contract_size = main_result.get("contract_size")
+    trade_type = str(main_result.get("trades", {}).get("trade_type", "unknown")).lower()
+    symbol = _get_symbol(pair, symbol_map)
+    if symbol is None:
+        return {"action": "ignored", "reason": "unknown symbol for pair"}
+
+    resolved_account_size = get_account_size() if account_size is None else float(account_size)
+    desired_lots = _calculate_target_lots(contract_size, pair, resolved_account_size, multiplier)
+    selected_sl_points = max(float(sl_points or default_sl_points), float(default_sl_points))
+    existing_net_lots = _symbol_net_volume(symbol)
+
+    if abs(existing_net_lots) < 0.001:
+        return {"action": "waiting", "reason": "no existing MT5 position found to adjust", "symbol": symbol}
+
+    desired_signed_lots = desired_lots if trade_type.startswith("buy") else -desired_lots
+    if existing_net_lots * desired_signed_lots < 0:
+        return {"action": "ignored", "reason": "position direction does not match requested trade direction", "symbol": symbol}
+
+    positions = _get_mt5_positions(symbol)
+    sl_updates = []
+    symbol_info = mt5.symbol_info(symbol)
+    if symbol_info is None:
+        return {"action": "ignored", "reason": "symbol info unavailable"}
+
+    point_value = float(getattr(symbol_info, "point", 0.01))
+    sl_distance = selected_sl_points * point_value
+    for pos in positions:
+        if (trade_type.startswith("buy") and pos.type == mt5.ORDER_TYPE_BUY) or (trade_type.startswith("sell") and pos.type == mt5.ORDER_TYPE_SELL):
+            if pos.type == mt5.ORDER_TYPE_BUY:
+                sl_price = pos.price_open - sl_distance
+            else:
+                sl_price = pos.price_open + sl_distance
+            request = {
+                "action": mt5.TRADE_ACTION_SLTP,
+                "position": pos.ticket,
+                "symbol": symbol,
+                "sl": sl_price,
+                "tp": pos.tp,
+            }
+            result = mt5.order_send(request)
+            sl_updates.append({"ticket": pos.ticket, "sl": sl_price, "result": result._asdict() if hasattr(result, "_asdict") else str(result)})
+
+    volume_to_add = max(0.0, abs(desired_lots) - abs(existing_net_lots))
+    add_result = {"status": "ignored", "reason": "no additional volume required"}
+    if volume_to_add >= 0.01:
+        add_result = _open_additional_volume(symbol, round(volume_to_add, 2), trade_type)
+
+    state = _load_state(state_path)
+    state.update({"pair": pair, "contract_size": contract_size, "lots": desired_signed_lots, "failure_count": 0})
+    _save_state(state, state_path)
+
+    return {
+        "action": "match_risk",
+        "symbol": symbol,
+        "desired_lots": round(desired_lots, 2),
+        "existing_net_lots": round(existing_net_lots, 2),
+        "added_lots": round(volume_to_add, 2),
+        "sl_points": round(selected_sl_points, 2),
+        "sl_updates": sl_updates,
+        "add_result": add_result,
+    }
 
 
 def sync_trade_with_mt5(
