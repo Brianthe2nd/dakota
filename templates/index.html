@@ -80,6 +80,16 @@
                         <label class="mb-2 block text-sm text-gray-300">Upload image</label>
                         <input id="risk-image-input" type="file" accept="image/*" class="block w-full text-sm text-gray-400" />
                         <canvas id="risk-canvas" class="mt-3 w-full rounded-lg border border-gray-700 bg-black"></canvas>
+                        <div class="mt-3 rounded-lg border border-gray-700 bg-black/70 p-2">
+                            <canvas id="risk-crop-canvas" class="w-full rounded-lg border border-gray-700 bg-black"></canvas>
+                            <div id="detected-prices" class="mt-2 flex flex-wrap gap-2"></div>
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <button id="set-entry-btn" type="button" class="rounded border border-blue-600 bg-blue-600/80 px-2 py-1 text-xs font-semibold">Set Entry</button>
+                                <button id="set-exit-btn" type="button" class="rounded border border-gray-600 px-2 py-1 text-xs font-semibold">Set Exit</button>
+                                <button id="apply-risk-btn" type="button" class="rounded border border-emerald-600 bg-emerald-600/80 px-2 py-1 text-xs font-semibold">Apply Match Risk</button>
+                            </div>
+                            <div id="selected-price-label" class="mt-2 text-xs text-gray-400">Entry: none • Exit: none</div>
+                        </div>
                     </div>
                     <div class="space-y-3">
                         <div>
@@ -161,11 +171,64 @@
                 </div>
             </div>
         </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div id="app-log-panel" class="bg-gray-800 rounded-xl border border-gray-700 shadow-lg flex flex-col min-h-[320px]">
+                <div class="p-4 border-b border-gray-700 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-white">App.py Logs</h2>
+                    <div class="flex gap-2">
+                        <button type="button" data-panel="app" data-action="maximize" class="rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700">Maximize</button>
+                        <button type="button" data-panel="app" data-action="toggle" class="rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700">Hide</button>
+                    </div>
+                </div>
+                <div class="p-3 flex-1 overflow-y-auto">
+                    <pre id="app-log-output" class="whitespace-pre-wrap text-xs text-gray-300 font-mono"></pre>
+                </div>
+            </div>
+
+            <div id="main-log-panel" class="bg-gray-800 rounded-xl border border-gray-700 shadow-lg flex flex-col min-h-[320px]">
+                <div class="p-4 border-b border-gray-700 flex items-center justify-between">
+                    <h2 class="text-lg font-semibold text-white">Main.py Logs</h2>
+                    <div class="flex gap-2">
+                        <button type="button" data-panel="main" data-action="maximize" class="rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700">Maximize</button>
+                        <button type="button" data-panel="main" data-action="toggle" class="rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700">Hide</button>
+                    </div>
+                </div>
+                <div class="p-3 flex-1 overflow-y-auto">
+                    <pre id="main-log-output" class="whitespace-pre-wrap text-xs text-gray-300 font-mono"></pre>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         const formatMoney = (num) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num || 0);
         let currentImage = null;
+        let currentDetectionRows = [];
+        let selectedEntryRow = null;
+        let selectedExitRow = null;
+        let activeSelectionMode = 'entry';
+        let pendingMatchRiskApplied = false;
+        const logPanelStates = { app: { maximized: false, hidden: false }, main: { maximized: false, hidden: false } };
+
+        function setLogPanelState(panelName, action) {
+            const panel = document.getElementById(`${panelName}-log-panel`);
+            const state = logPanelStates[panelName];
+            if (!panel || !state) return;
+
+            if (action === 'maximize') {
+                state.maximized = !state.maximized;
+                panel.classList.toggle('fixed', state.maximized);
+                panel.classList.toggle('inset-4', state.maximized);
+                panel.classList.toggle('z-50', state.maximized);
+                panel.classList.toggle('h-[calc(100vh-2rem)]', state.maximized);
+                panel.classList.toggle('w-[calc(100vw-2rem)]', state.maximized);
+                panel.classList.toggle('overflow-hidden', state.maximized);
+            } else if (action === 'toggle') {
+                state.hidden = !state.hidden;
+                panel.classList.toggle('hidden', state.hidden);
+            }
+        }
 
         async function fetchDashboardData() {
             try {
@@ -247,8 +310,24 @@
                     });
                 }
                 document.getElementById('mt5-body').innerHTML = mt5Html;
+
+                if (data.pending_match_risk && !pendingMatchRiskApplied) {
+                    pendingMatchRiskApplied = true;
+                    applyPendingMatchRisk(data.pending_match_risk);
+                }
             } catch (error) {
                 console.error('Dashboard Sync Error:', error);
+            }
+        }
+
+        async function fetchLogData() {
+            try {
+                const response = await fetch('/api/logs?max_lines=300');
+                const data = await response.json();
+                document.getElementById('app-log-output').textContent = data.app || '';
+                document.getElementById('main-log-output').textContent = data.main || '';
+            } catch (error) {
+                console.error('Log Sync Error:', error);
             }
         }
 
@@ -276,6 +355,148 @@
             context.strokeRect(x, y, width, height);
         }
 
+        function getCropRect() {
+            if (!currentImage) return { x: 0, y: 0, width: 0, height: 0 };
+            const image = currentImage;
+            const x = Number(document.getElementById('crop-x').value) / 100 * image.width;
+            const y = Number(document.getElementById('crop-y').value) / 100 * image.height;
+            const width = Number(document.getElementById('crop-width').value) / 100 * image.width;
+            const height = Number(document.getElementById('crop-height').value) / 100 * image.height;
+            return { x, y, width, height };
+        }
+
+        function renderDetectedPrices(rows) {
+            const container = document.getElementById('detected-prices');
+            if (!rows.length) {
+                container.innerHTML = '<span class="text-xs text-gray-500">No highlighted rows detected yet.</span>';
+                return;
+            }
+            container.innerHTML = rows.map((row, index) => {
+                const selected = (selectedEntryRow && selectedEntryRow === row) || (selectedExitRow && selectedExitRow === row);
+                const color = row.color === 'green' ? 'bg-emerald-600/80' : 'bg-rose-600/80';
+                return `<button type="button" data-index="${index}" class="rounded border border-gray-600 px-2 py-1 text-xs font-semibold ${color} ${selected ? 'ring-2 ring-white' : ''}">${row.price_text || 'Unknown'} (${row.color || 'row'})</button>`;
+            }).join('');
+            container.querySelectorAll('button[data-index]').forEach(button => {
+                button.addEventListener('click', () => selectDetectedRow(Number(button.dataset.index)));
+            });
+        }
+
+        function renderProcessedCrop(rows) {
+            const canvas = document.getElementById('risk-crop-canvas');
+            const context = canvas.getContext('2d');
+            if (!currentImage) return;
+            const rect = getCropRect();
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = rect.width;
+            tempCanvas.height = rect.height;
+            tempCanvas.getContext('2d').drawImage(currentImage, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            context.drawImage(tempCanvas, 0, 0);
+            rows.forEach((row) => {
+                const [x, y, width, height] = row.bbox || [0, 0, rect.width, rect.height];
+                const color = row.color === 'green' ? '#16a34a' : '#dc2626';
+                context.strokeStyle = color;
+                context.lineWidth = 2;
+                context.strokeRect(x, y, width, height);
+                context.fillStyle = color;
+                context.font = '12px sans-serif';
+                context.fillText(row.price_text || '', x + 2, y + 12);
+            });
+        }
+
+        function refreshSelectionText() {
+            const entryLabel = selectedEntryRow ? selectedEntryRow.price_text || selectedEntryRow.price : 'none';
+            const exitLabel = selectedExitRow ? selectedExitRow.price_text || selectedExitRow.price : 'none';
+            document.getElementById('selected-price-label').innerText = `Entry: ${entryLabel} • Exit: ${exitLabel}`;
+        }
+
+        function selectDetectedRow(index) {
+            const row = currentDetectionRows[index];
+            if (!row) return;
+            if (activeSelectionMode === 'entry') {
+                selectedEntryRow = row;
+            } else {
+                selectedExitRow = row;
+            }
+            refreshSelectionText();
+            renderDetectedPrices(currentDetectionRows);
+        }
+
+        function setSelectionMode(mode) {
+            activeSelectionMode = mode;
+            document.getElementById('set-entry-btn').className = mode === 'entry' ? 'rounded border border-blue-600 bg-blue-600/80 px-2 py-1 text-xs font-semibold' : 'rounded border border-gray-600 px-2 py-1 text-xs font-semibold';
+            document.getElementById('set-exit-btn').className = mode === 'exit' ? 'rounded border border-purple-600 bg-purple-600/80 px-2 py-1 text-xs font-semibold' : 'rounded border border-gray-600 px-2 py-1 text-xs font-semibold';
+        }
+
+        async function analyzeCrop() {
+            if (!currentImage) {
+                document.getElementById('match-risk-result').innerText = 'Upload an image first.';
+                return;
+            }
+            const imageCanvas = document.createElement('canvas');
+            imageCanvas.width = currentImage.width;
+            imageCanvas.height = currentImage.height;
+            imageCanvas.getContext('2d').drawImage(currentImage, 0, 0);
+            const imageData = imageCanvas.toDataURL('image/png');
+            const crop = {
+                x: Number(document.getElementById('crop-x').value),
+                y: Number(document.getElementById('crop-y').value),
+                width: Number(document.getElementById('crop-width').value),
+                height: Number(document.getElementById('crop-height').value),
+            };
+            const payload = {
+                image: imageData,
+                crop,
+            };
+            try {
+                const response = await fetch('/api/process-price-crop', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await response.json();
+                currentDetectionRows = result.rows || [];
+                renderDetectedPrices(currentDetectionRows);
+                renderProcessedCrop(currentDetectionRows);
+                document.getElementById('match-risk-result').innerText = `Detected ${currentDetectionRows.length} highlighted rows. Pick entry and exit levels.`;
+            } catch (error) {
+                console.error('Crop analysis failed:', error);
+                document.getElementById('match-risk-result').innerText = 'Crop analysis failed.';
+            }
+        }
+
+        async function applyPendingMatchRisk(pending) {
+            if (!pending) return;
+            if (pending.pair) document.getElementById('risk-pair').value = pending.pair;
+            if (pending.contract_size != null) document.getElementById('risk-contract-size').value = pending.contract_size;
+            if (pending.trade_type) document.getElementById('risk-trade-type').value = pending.trade_type;
+            if (pending.image_data) {
+                const image = new Image();
+                image.onload = () => {
+                    currentImage = image;
+                    updateCropPreview();
+                    analyzeCrop();
+                };
+                image.src = pending.image_data;
+            } else if (pending.image_path) {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                const pendingImage = data.pending_match_risk?.image_data;
+                if (pendingImage) {
+                    const image = new Image();
+                    image.onload = () => {
+                        currentImage = image;
+                        updateCropPreview();
+                        analyzeCrop();
+                    };
+                    image.src = pendingImage;
+                }
+            }
+            document.getElementById('match-risk-panel').classList.remove('hidden');
+            document.getElementById('calculator-panel').classList.add('hidden');
+        }
+
         document.getElementById('risk-image-input').addEventListener('change', (event) => {
             const file = event.target.files[0];
             if (!file) return;
@@ -292,7 +513,14 @@
         });
 
         ['crop-x', 'crop-y', 'crop-width', 'crop-height'].forEach(id => {
-            document.getElementById(id).addEventListener('input', updateCropPreview);
+            document.getElementById(id).addEventListener('input', () => {
+                updateCropPreview();
+                renderProcessedCrop(currentDetectionRows);
+            });
+        });
+
+        document.querySelectorAll('[data-panel]').forEach((button) => {
+            button.addEventListener('click', () => setLogPanelState(button.dataset.panel, button.dataset.action));
         });
 
         document.getElementById('match-risk-btn').addEventListener('click', () => {
@@ -305,26 +533,35 @@
             document.getElementById('match-risk-panel').classList.add('hidden');
         });
 
-        document.getElementById('process-risk-btn').addEventListener('click', async () => {
-            if (!currentImage) {
-                document.getElementById('match-risk-result').innerText = 'Upload an image first.';
+        document.getElementById('process-risk-btn').addEventListener('click', analyzeCrop);
+
+        document.getElementById('set-entry-btn').addEventListener('click', () => setSelectionMode('entry'));
+        document.getElementById('set-exit-btn').addEventListener('click', () => setSelectionMode('exit'));
+
+        document.getElementById('apply-risk-btn').addEventListener('click', async () => {
+            if (!currentImage || !selectedEntryRow || !selectedExitRow) {
+                document.getElementById('match-risk-result').innerText = 'Select both entry and exit price levels first.';
                 return;
             }
-            const canvas = document.getElementById('risk-canvas');
-            const imageData = canvas.toDataURL('image/png');
-            const crop = {
-                x: Number(document.getElementById('crop-x').value),
-                y: Number(document.getElementById('crop-y').value),
-                width: Number(document.getElementById('crop-width').value),
-                height: Number(document.getElementById('crop-height').value),
-            };
+            const imageCanvas = document.createElement('canvas');
+            imageCanvas.width = currentImage.width;
+            imageCanvas.height = currentImage.height;
+            imageCanvas.getContext('2d').drawImage(currentImage, 0, 0);
+            const imageData = imageCanvas.toDataURL('image/png');
             const payload = {
                 image: imageData,
-                crop,
+                crop: {
+                    x: Number(document.getElementById('crop-x').value),
+                    y: Number(document.getElementById('crop-y').value),
+                    width: Number(document.getElementById('crop-width').value),
+                    height: Number(document.getElementById('crop-height').value),
+                },
                 pair: document.getElementById('risk-pair').value,
                 contract_size: Number(document.getElementById('risk-contract-size').value),
                 trade_type: document.getElementById('risk-trade-type').value,
                 sl_points: Number(document.getElementById('risk-sl-points').value),
+                selected_entry_price: selectedEntryRow.price,
+                selected_exit_price: selectedExitRow.price,
             };
             const response = await fetch('/api/match-risk', {
                 method: 'POST',
@@ -350,8 +587,11 @@
             document.getElementById('calculator-result').innerText = `Result: ${result.result}`;
         });
 
+        setSelectionMode('entry');
         setInterval(fetchDashboardData, 1500);
+        setInterval(fetchLogData, 1500);
         fetchDashboardData();
+        fetchLogData();
     </script>
 </body>
 </html>

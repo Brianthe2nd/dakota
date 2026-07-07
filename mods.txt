@@ -1,0 +1,14 @@
+looks good, but I would like some changes ,first the account size ,DD limit and max idea risk are flashing ,btwn 0 and the actual no. please fix that 
+I believe it is how we are updating the json file
+
+next I would like to live execution logs to be written just as they were and then below that create a section with the logs from running main.py and logs for 
+app.py in two small separate windows with the option to maximize or entirely hide each. Also save all the logs in a txt file and use that to display them in real time instead of using the json
+I want to see all the logs ,but they should be scrollable ,not an infinite window
+
+next is the match risk I would like this to autopull the image when a new trade idea is discovered, meaning that it did not exist in the prev frame but it does exist
+now then autofill the contract size pair and tradetype .I realized that I did not include the function to process the crop so refer to process_price_crop.py
+to see how we do that ,then let me choose the price levels I would like to use to calculate the sl (incase there are multiple red colors in the image crop)
+we can do this by highlighting the different discovered boxes with diff colors then letting me choose then ones I want to use as the exit and entry.The entrire goal here
+is to let me process the images as fast as possible so if you can think of a better way please let me know or just do it that way.
+
+lastly for the calculator rename the x ,denom and num

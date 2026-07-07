@@ -64,9 +64,31 @@ def mt5_data_poller(dash_state):
         time.sleep(2) # Poll every 2 seconds
 
 def build_mt5_callback(prop_manager, dashboard_state, account_size=10000.0, multiplier=1.0, state_path="mt5_state.json", symbol_map=None):
+    last_trade_signature = None
+
     def handle_result(result, image_path):
+        nonlocal last_trade_signature
         if result.get("status") != "success":
             return
+
+        trade_signature = (
+            result.get("pair"),
+            result.get("contract_size"),
+            result.get("trades", {}).get("trade_type"),
+            result.get("status"),
+        )
+        if trade_signature != last_trade_signature:
+            last_trade_signature = trade_signature
+            dashboard_state.update(
+                "pending_match_risk",
+                {
+                    "pair": result.get("pair"),
+                    "contract_size": result.get("contract_size"),
+                    "trade_type": result.get("trades", {}).get("trade_type"),
+                    "image_path": image_path,
+                    "source": "new_trade_signal",
+                },
+            )
 
         print(f"Synchronizing MT5 for {image_path}...")
         try:
@@ -123,7 +145,7 @@ def main():
         args.daily_dd = float((2/100)* account_size)
     # 1. Initialize Dashboard State
     dash_state = DashboardState()
-    dash_state.install_log_stream()
+    dash_state.install_log_stream(log_path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs", "main.py.log"), stream_name="main.py")
     dash_state.update("metrics", {"account_size": account_size})
 
     # 2. Start Background Data Poller

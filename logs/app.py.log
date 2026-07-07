@@ -1,0 +1,44 @@
+[2026-07-07 13:17:26] [app.py] * Serving Flask app 'app'
+[2026-07-07 13:17:26] [dashboard] {"time": "13:17:26", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Serving Flask app 'app'"}
+[2026-07-07 13:17:26] [app.py] * Debug mode: on
+[2026-07-07 13:17:26] [dashboard] {"time": "13:17:26", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Debug mode: on"}
+[2026-07-07 13:17:27] [app.py] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+[2026-07-07 13:17:27] [app.py] * Running on http://127.0.0.1:5000
+[2026-07-07 13:17:27] [dashboard] {"time": "13:17:27", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "\u001b[31m\u001b[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\u001b[0m\n * Running on http://127.0.0.1:5000"}
+[2026-07-07 13:17:27] [app.py] [33mPress CTRL+C to quit[0m
+[2026-07-07 13:17:27] [dashboard] {"time": "13:17:27", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "\u001b[33mPress CTRL+C to quit\u001b[0m"}
+[2026-07-07 13:17:27] [app.py] * Restarting with stat
+[2026-07-07 13:17:27] [dashboard] {"time": "13:17:27", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Restarting with stat"}
+[2026-07-07 13:17:27] [app.py] * Debugger is active!
+[2026-07-07 13:17:27] [dashboard] {"time": "13:17:27", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Debugger is active!"}
+[2026-07-07 13:17:28] [app.py] * Debugger PIN: 595-818-959
+[2026-07-07 13:17:28] [dashboard] {"time": "13:17:28", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Debugger PIN: 595-818-959"}
+[2026-07-07 13:17:45] [app.py] 127.0.0.1 - - [07/Jul/2026 13:17:45] "GET /api/logs?max_lines=20 HTTP/1.1" 200 -
+[2026-07-07 13:17:45] [dashboard] {"time": "13:17:45", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "127.0.0.1 - - [07/Jul/2026 13:17:45] \"GET /api/logs?max_lines=20 HTTP/1.1\" 200 -"}
+[2026-07-07 13:32:55] [app.py] * Serving Flask app 'app'
+[2026-07-07 13:32:55] [dashboard] {"time": "13:32:55", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Serving Flask app 'app'"}
+[2026-07-07 13:32:55] [app.py] * Debug mode: on
+[2026-07-07 13:32:55] [dashboard] {"time": "13:32:55", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Debug mode: on"}
+[2026-07-07 13:32:56] [app.py] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+[2026-07-07 13:32:56] [app.py] * Running on http://127.0.0.1:5000
+[2026-07-07 13:32:56] [dashboard] {"time": "13:32:56", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "\u001b[31m\u001b[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.\u001b[0m\n * Running on http://127.0.0.1:5000"}
+[2026-07-07 13:32:56] [app.py] [33mPress CTRL+C to quit[0m
+[2026-07-07 13:32:56] [dashboard] {"time": "13:32:56", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "\u001b[33mPress CTRL+C to quit\u001b[0m"}
+[2026-07-07 13:32:57] [app.py] * Restarting with stat
+[2026-07-07 13:32:57] [dashboard] {"time": "13:32:57", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Restarting with stat"}
+[2026-07-07 13:32:58] [app.py] * Debugger is active!
+[2026-07-07 13:32:58] [dashboard] {"time": "13:32:58", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Debugger is active!"}
+[2026-07-07 13:32:58] [app.py] * Debugger PIN: 595-818-959
+[2026-07-07 13:32:58] [dashboard] {"time": "13:32:58", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Debugger PIN: 595-818-959"}
+[2026-07-07 13:34:18] [app.py] 127.0.0.1 - - [07/Jul/2026 13:34:18] "GET /api/data HTTP/1.1" 200 -
+[2026-07-07 13:34:18] [dashboard] {"time": "13:34:18", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "127.0.0.1 - - [07/Jul/2026 13:34:18] \"GET /api/data HTTP/1.1\" 200 -"}
+[2026-07-07 13:35:36] [app.py] 127.0.0.1 - - [07/Jul/2026 13:35:36] "POST /api/process-price-crop HTTP/1.1" 200 -
+[2026-07-07 13:35:36] [dashboard] {"time": "13:35:36", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "127.0.0.1 - - [07/Jul/2026 13:35:36] \"POST /api/process-price-crop HTTP/1.1\" 200 -"}
+[2026-07-07 13:36:13] [app.py] * Detected change in '/home/brian/Desktop/yt/mt5_funcs.py', reloading
+[2026-07-07 13:36:13] [dashboard] {"time": "13:36:13", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Detected change in '/home/brian/Desktop/yt/mt5_funcs.py', reloading"}
+[2026-07-07 13:36:13] [app.py] * Restarting with stat
+[2026-07-07 13:36:13] [dashboard] {"time": "13:36:13", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Restarting with stat"}
+[2026-07-07 13:36:15] [app.py] * Debugger is active!
+[2026-07-07 13:36:15] [dashboard] {"time": "13:36:15", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Debugger is active!"}
+[2026-07-07 13:36:15] [app.py] * Debugger PIN: 595-818-959
+[2026-07-07 13:36:15] [dashboard] {"time": "13:36:15", "pair": "System", "contract_size": "", "trade_type": "Console", "result": "INFO", "reason": "* Debugger PIN: 595-818-959"}

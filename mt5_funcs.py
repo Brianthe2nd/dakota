@@ -83,6 +83,13 @@ def calculate_calculator_result(x: float, numerator: float = 150.0, denominator:
     return (float(numerator) / float(x)) * float(denominator)
 
 
+def calculate_sl_points_from_price_levels(entry_price: float, exit_price: float, point_value: Optional[float] = None) -> float:
+    distance = abs(float(exit_price) - float(entry_price))
+    if point_value is not None and point_value > 0:
+        return round(distance / float(point_value), 2)
+    return round(distance, 2)
+
+
 def estimate_sl_points_from_crop(image_path: Optional[str], crop: Optional[Dict] = None, default_points: float = 150.0) -> float:
     if not image_path or not os.path.exists(image_path):
         return float(default_points)
